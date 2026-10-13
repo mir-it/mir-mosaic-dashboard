@@ -3,7 +3,7 @@ const defaultTimes=['08:00:00','12:00:00','13:00:00','17:00:00'];
 const seconds=time=>{const p=String(time).split(':').map(Number);return p.length>=2&&p.every(Number.isFinite)?p[0]*3600+p[1]*60+(p[2]||0):NaN;};
 function combinations(values,count){if(!count)return [[]];const result=[];for(let i=0;i<=values.length-count;i++)for(const tail of combinations(values.slice(i+1),count-1))result.push([values[i],...tail]);return result;}
 export function assignPunchRoles(entries,expectedTimes=defaultTimes){
- const result=entries.map(p=>({...p})),targets=expectedTimes.map(seconds);
+ const result=entries.map(p=>({...p,role:p.enabled?p.role:'extra'})),targets=expectedTimes.map(seconds);
  const active=result.map((p,index)=>({p,index,time:seconds(p.time)})).filter(x=>x.p.enabled&&Number.isFinite(x.time)).sort((a,b)=>a.time-b.time);
  const reserved=new Set(result.filter(p=>p.enabled&&!Number.isFinite(seconds(p.time))&&punchRoles.includes(p.role)).map(p=>p.role));
  const available=[0,1,2,3].filter(i=>!reserved.has(punchRoles[i]));const n=Math.min(active.length,available.length);let best=null;
