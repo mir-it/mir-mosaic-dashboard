@@ -28,4 +28,4 @@ LAN access is opt-in in `config.json` and needs an inbound firewall rule for por
 
 `npm test` runs JavaScript tests. `python -B -m unittest discover -s tests -p "test_*.py"` checks calculations and Excel output. Payclock integration tests require a local configured Payclock installation and approved fixture exports; no employee exports are distributed in this repository.
 
-In the day editor, toggling Include proposes new roles for enabled punches without changing their times. Add missing punch identifies a missing shift role and inserts an editable estimate constrained between neighboring punches, using employee history when available. These actions change only the unsaved draft; verify estimated times before saving.
+In the day editor, toggling Include proposes new roles for enabled punches without changing their times. Add missing punch identifies a missing shift role and inserts a blank time field in the correct role position. It never estimates a missing timestamp: enter the actual time before saving. These actions change only the unsaved draft.
