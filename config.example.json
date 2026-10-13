@@ -1,0 +1,32 @@
+{
+  "company": "Mir Mosaic",
+  "port": 4320,
+  "lan": {
+    "enabled": false,
+    "address": "192.168.0.10",
+    "subnet": "192.168.0.0/24"
+  },
+  "timezone": "America/Los_Angeles",
+  "partnerPayloads": "C:/MirMosaic/partner-orders/data/payloads",
+  "fedfishCentral": {
+    "url": "https://localhost:4319",
+    "caFile": "C:/MirMosaic/FedFish Central/data/certs/ca.pem"
+  },
+  "payclockExports": "C:/MirMosaic/payclock/exports",
+  "payclock": {
+    "project": "C:/MirMosaic/payclock",
+    "host": "192.168.0.185",
+    "python": "python"
+  },
+  "inventory": {
+    "enabled": true,
+    "url": "http://127.0.0.1:8080/api/parts/inventory",
+    "cacheMinutes": 15
+  },
+  "ai": {
+    "enabled": false,
+    "provider": "openai",
+    "model": "",
+    "allowCloudSummary": false
+  }
+}
