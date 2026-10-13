@@ -1,6 +1,6 @@
 # Mir Mosaic Operations Dashboard
 
-Local company dashboard for FedFish orders, Payclock attendance and AI Email Processor activity. Existing application data and clock records are read-only. Four individual PIN sessions lock after 15 minutes.
+Local company dashboard for FedFish orders, Payclock attendance and AI Email Processor activity. Existing application data and clock records are read-only. Four individual PIN sessions lock after 15 minutes of inactivity.
 
 ## Run locally
 
@@ -29,3 +29,5 @@ LAN access is opt-in in `config.json` and needs an inbound firewall rule for por
 `npm test` runs JavaScript tests. `python -B -m unittest discover -s tests -p "test_*.py"` checks calculations and Excel output. Payclock integration tests require a local configured Payclock installation and approved fixture exports; no employee exports are distributed in this repository.
 
 In the day editor, toggling Include proposes new roles for enabled punches without changing their times. Add missing punch identifies a missing shift role and inserts a blank time field in the correct role position. It never estimates a missing timestamp: enter the actual time before saving. These actions change only the unsaved draft.
+
+Sessions lock after 15 minutes of inactivity. Trusted clicks, typing, touch and scrolling renew the session through a throttled server activity endpoint. Background report polling does not renew sessions. Expiry updates are shared across tabs for the same browser origin; manual Lock signs the session out immediately.

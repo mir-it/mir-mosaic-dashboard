@@ -12,6 +12,7 @@ export async function createAccess(root){
   return {
     names:users.map(u=>u.name),
     session(req){const t=token(req),s=sessions.get(t);if(!s||s.expires<=Date.now()){sessions.delete(t);return null;}return {name:s.name,expires:s.expires};},
+    touch(req){const identity=this.session(req);if(!identity)return null;const t=token(req),s=sessions.get(t);s.expires=Date.now()+duration;return {session:{name:s.name,expires:s.expires},cookie:`mir_session=${t}; HttpOnly; SameSite=Strict; Path=/; Max-Age=900`};},
     login(req,name,pin){const key=req.socket.remoteAddress;let a=attempts.get(key);if(!a||Date.now()-a.at>900000){a={at:Date.now(),count:0};attempts.set(key,a);}if(a.count>=8)throw Object.assign(Error('Too many attempts. Try again in 15 minutes.'),{status:429});a.count++;
       const validPin=typeof pin==='string'&&/^\d{4}$/.test(pin);let user;for(const candidate of users){const matches=timingSafeEqual(scryptSync(validPin?pin:'invalid',candidate.salt,32),Buffer.from(candidate.hash,'hex'));if(validPin&&matches)user=candidate;}if(!user)throw Object.assign(Error('Incorrect name or PIN.'),{status:401});
       attempts.delete(key);sessions.delete(token(req));for(const [t,s] of sessions)if(s.expires<=Date.now())sessions.delete(t);const t=randomBytes(32).toString('hex'),s={name:user.name,expires:Date.now()+duration};sessions.set(t,s);return {session:s,cookie:`mir_session=${t}; HttpOnly; SameSite=Strict; Path=/; Max-Age=900`};

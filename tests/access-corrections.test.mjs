@@ -1,6 +1,10 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {mkdtemp,readFile,rm} from 'node:fs/promises';import os from 'node:os';import path from 'node:path';
 import {createAccess} from '../access.mjs';import {createCorrections} from '../corrections.mjs';
+test('user activity renews idle expiry; background reads cannot renew expired sessions',async t=>{
+ const root=await mkdtemp(path.join(os.tmpdir(),'mir-idle-'));t.after(()=>rm(root,{recursive:true,force:true}));const auth=await createAccess(root),pin=(await readFile(path.join(root,'data/access/initial-pins.txt'),'utf8')).split('\n')[0].split(': ')[1];const req={headers:{},socket:{remoteAddress:'test-idle'}};
+ const realNow=Date.now;let now=realNow();Date.now=()=>now;t.after(()=>Date.now=realNow);const login=auth.login(req,null,pin);const initialExpiry=login.session.expires;req.headers.cookie=login.cookie.split(';')[0];now+=10*60*1000;const renewed=auth.touch(req);assert(renewed.session.expires>initialExpiry);assert(renewed.cookie.includes('Max-Age=900'));now+=6*60*1000;assert.equal(auth.session(req).name,'Bayel');const cutoff=renewed.session.expires;assert.equal(auth.session(req).expires,cutoff);now=cutoff;assert.equal(auth.session(req),null);assert.equal(auth.touch(req),null);
+});
 test('individual PINs, server expiry, logout and rate limiting',async t=>{
  const root=await mkdtemp(path.join(os.tmpdir(),'mir-access-'));t.after(()=>rm(root,{recursive:true,force:true}));const auth=await createAccess(root),lines=(await readFile(path.join(root,'data/access/initial-pins.txt'),'utf8')).split('\n');assert.equal(new Set(lines.map(l=>l.split(': ')[1])).size,4);
  const req={headers:{},socket:{remoteAddress:'127.0.0.1'}},pin=lines[0].split(': ')[1];const login=auth.login(req,'Bayel',pin);req.headers.cookie=login.cookie.split(';')[0];assert.equal(auth.session(req).name,'Bayel');const now=Date.now;t.after(()=>Date.now=now);Date.now=()=>login.session.expires+1;assert.equal(auth.session(req),null);Date.now=now;
