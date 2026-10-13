@@ -192,7 +192,7 @@ $('worker-prev').addEventListener('click',()=>navigateWorkerDay(-1));$('worker-n
 $('day-dialog').addEventListener('close',()=>{dayGeneration++;});
 async function initialize(){
   $('start').max=today;
-  request('/api/payclock/schedule').then(s=>{$('schedule-status').textContent='Automatic pull: 11 PM Pacific while this computer and dashboard are running. Yesterday is finalized; today remains partial.'+(s.lastSuccess?' Last completed: '+new Date(s.lastSuccess).toLocaleString()+'.':'')+(s.error?' Last attempt: '+s.error:'');}).catch(()=>{});
+  request('/api/payclock/schedule').then(s=>{$('schedule-status').textContent='Automatic pull: 11 PM Pacific while the server computer and dashboard service are running. Yesterday is finalized; today remains partial.'+(s.lastSuccess?' Last completed: '+new Date(s.lastSuccess).toLocaleString()+'.':'')+(s.error?' Last attempt: '+s.error:'');}).catch(()=>{});
   try{$('load-status').textContent='Loading your saved local history…';const value=await request('/api/payclock/latest');if(value.report){$('start').value=value.report.start;$('end').value=value.report.end;displayReport(value.report,value.id);}else{$('load-status').textContent='Select a day or range to fetch missing timestamps.';renderCalendar();}}
   catch(e){$('time-error').textContent=e.message;$('time-error').hidden=false;renderCalendar();}
 }
