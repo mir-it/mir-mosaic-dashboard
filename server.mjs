@@ -115,7 +115,7 @@ const server=http.createServer(async(req,res)=>{
       }finally{aiBusy=false;}
     }
     if(!['GET','HEAD'].includes(req.method))return reply(res,405,{error:'Business mutations are not supported.'});
-    const assets={'/':['index.html','text/html'],'/fedfish':['index.html','text/html'],'/email':['index.html','text/html'],'/adviser':['index.html','text/html'],'/app.js':['app.js','text/javascript'],'/style.css':['style.css','text/css'],'/favicon.svg':['favicon.svg','image/svg+xml'],'/payclock':['payclock.html','text/html'],'/payclock.js':['payclock.js','text/javascript'],'/payclock.css':['payclock.css','text/css']};
+    const assets={'/':['index.html','text/html'],'/fedfish':['index.html','text/html'],'/email':['index.html','text/html'],'/adviser':['index.html','text/html'],'/app.js':['app.js','text/javascript'],'/style.css':['style.css','text/css'],'/favicon.svg':['favicon.svg','image/svg+xml'],'/payclock':['payclock.html','text/html'],'/punch-assign.js':['punch-assign.js','text/javascript'],'/payclock.js':['payclock.js','text/javascript'],'/payclock.css':['payclock.css','text/css']};
     const asset=assets[u.pathname];if(!asset)return reply(res,404,{error:'Not found.'});
     reply(res,200,await readFile(path.join(root,'public',asset[0]),'utf8'),asset[1]);
   }catch(e){reply(res,500,{error:e.message || 'Monitoring failed.'});}

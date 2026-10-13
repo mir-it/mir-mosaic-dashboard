@@ -62,7 +62,7 @@ def enrich(report,original,all_rows,history):
         missing=[LABELS[i] for i in range(4) if not best or i not in best[1].values()]
         if len(times)==3:flags.append('Suggested missing: '+', '.join(missing))
         for flag in flags:counts[flag]+=1
-        row['originalPunches']=times;row['suggestion']={'punches':assignments,'flags':flags,'basis':f'{len(sample)} complete four-punch days for this employee' if len(sample)>=3 else 'Default shift times; insufficient employee history','missing':missing,'confidence':'Moderate' if len(sample)>=3 else 'Low'}
+        row['originalPunches']=times;row['suggestion']={'punches':assignments,'flags':flags,'basis':f'{len(sample)} complete four-punch days for this employee' if len(sample)>=3 else 'Default shift times; insufficient employee history','missing':missing,'confidence':'Moderate' if len(sample)>=3 else 'Low','expectedTimes':['%02d:%02d:%02d' % (int(round(v*60))//3600,int(round(v*60))//60%60,int(round(v*60))%60) for v in target]}
         row['audit']=history.get(key,[]);row['revision']=row['audit'][0]['id'] if row['audit'] else 0
         if row['audit'] and not row['audit'][0].get('restoreOriginal'):
             edit=row['audit'][0];active=[p for p in edit['punches'] if p['enabled']];role_times={p['role']:p['time'] for p in active}
