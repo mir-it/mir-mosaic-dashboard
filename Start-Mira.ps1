@@ -9,7 +9,10 @@ try {
 $taskNode = (Get-Command node -ErrorAction SilentlyContinue).Source
 if (-not $taskNode) { $taskNode = 'C:\Users\IT MIR\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe' }
 if (-not (Test-Path -LiteralPath $taskNode)) { throw 'Node.js is required to start the separate dashboard.' }
-Start-Process -FilePath $taskNode -ArgumentList ('"' + (Join-Path $taskRoot 'server.mjs') + '"') -WorkingDirectory $taskRoot -WindowStyle Hidden
+$taskRuntime = Join-Path $taskRoot 'data\runtime'
+New-Item -ItemType Directory -Path $taskRuntime -Force | Out-Null
+$taskProcess = Start-Process -FilePath $taskNode -ArgumentList ('"' + (Join-Path $taskRoot 'server.mjs') + '"') -WorkingDirectory $taskRoot -WindowStyle Hidden -RedirectStandardOutput (Join-Path $taskRuntime 'server.log') -RedirectStandardError (Join-Path $taskRuntime 'server-error.log') -PassThru
+$taskProcess.Id | Set-Content -LiteralPath (Join-Path $taskRuntime 'server.pid')
 for ($taskAttempt = 0; $taskAttempt -lt 20; $taskAttempt++) {
     Start-Sleep -Milliseconds 750
     try {

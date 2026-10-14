@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'Stop'
 $taskConfig = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'config.json') -Raw | ConvertFrom-Json
 $taskServerPath = (Join-Path $PSScriptRoot 'server.mjs').Replace('\', '/')
-$taskConnections = Get-NetTCPConnection -LocalAddress '127.0.0.1' -LocalPort $taskConfig.port -State Listen -ErrorAction SilentlyContinue
+$taskConnections = Get-NetTCPConnection -LocalPort $taskConfig.port -State Listen -ErrorAction SilentlyContinue
 foreach ($taskConnection in $taskConnections) {
     $taskProcess = Get-CimInstance Win32_Process -Filter ('ProcessId = ' + $taskConnection.OwningProcess)
     $taskCommand = ([string]$taskProcess.CommandLine).Replace('\', '/')
