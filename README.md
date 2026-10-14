@@ -44,3 +44,5 @@ While enabled and connected, the running server scans fresh clock data every fiv
 Emails describe clock-record observations for human review, not confirmed absences or misconduct. Recipients get a digest of new items, deduplicated by employee and event (late patterns once per calendar month; missing runs once per run; lunch once per day). A durable in-flight marker prevents blind re-sending after an ambiguous Gmail/network failure. Check Gmail Sent before using the explicit retry control. No live email has been sent until the requested sender is connected.
 
 Windows Start-Mira starts a detached hidden dashboard process and records its PID and logs in `data/runtime/`. Closing the chat does not control that process. Stop-Mira verifies the server command line before stopping the LAN listener. The current deployment is in email testing mode with it@mir-mosaic.com as the sole recipient; restore manager recipients through alert settings after testing.
+
+Attendance alerts use a branded HTML layout with category counts, employee cards, evidence tables and a Payclock link, plus a plain-text alternative. Preview email design shows sample data without sending any email.
