@@ -31,3 +31,14 @@ LAN access is opt-in in `config.json` and needs an inbound firewall rule for por
 In the day editor, toggling Include proposes new roles for enabled punches without changing their times. Add missing punch identifies a missing shift role and inserts a blank time field in the correct role position. It never estimates a missing timestamp: enter the actual time before saving. These actions change only the unsaved draft.
 
 Sessions lock after 15 minutes of inactivity. Trusted clicks, typing, touch and scrolling renew the session through a throttled server activity endpoint. Background report polling does not renew sessions. Expiry updates are shared across tabs for the same browser origin; manual Lock signs the session out immediately.
+
+
+## Manager attendance alerts
+
+Expand Manager attendance alerts in Payclock. Bayel can manage recipients, enable/pause delivery, adjust thresholds, exclude employee IDs and enter approved-leave date ranges. Initial recipients are Emin and Fatima; Tatyana can be added later. Settings and email delivery history live under ignored `data/alerts/`.
+
+From the server computer, open `http://localhost:4320/payclock`, sign in as Bayel and select Connect it@ Gmail. Authorize **it@mir-mosaic.com**. A dedicated OAuth token is saved locally; existing AI Email Processor credentials/tokens are not modified. Only the Gmail send and email identity scopes are requested, and sender identity is verified. `attendanceAlerts.gmailClientFile` points to a Google Desktop OAuth client JSON. The server must have outbound internet access to Google.
+
+While enabled and connected, the running server scans fresh clock data every five minutes from 6 AM to 9 PM Pacific, using saved corrections. Possible lunch delays are flagged four elapsed hours after arrival if no earlier lunch-out is recorded. Lateness means a first punch strictly after 8:30 AM on a weekday, with three such days in 30 days by default. Missing-work alerts require three consecutive completed expected weekdays without punches; weekends are optional. Never-fetched or partial closed dates cannot substantiate missing work. Approved leave and exclusions suppress matching cases. The eligibility window uses employees observed in the previous 30 days; roster/employment status and nonstandard shifts must be verified by a manager.
+
+Emails describe clock-record observations for human review, not confirmed absences or misconduct. Recipients get a digest of new items, deduplicated by employee and event (late patterns once per calendar month; missing runs once per run; lunch once per day). A durable in-flight marker prevents blind re-sending after an ambiguous Gmail/network failure. Check Gmail Sent before using the explicit retry control. No live email has been sent until the requested sender is connected.

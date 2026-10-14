@@ -1,4 +1,6 @@
 import http from 'node:http';
+import {createAlertGmail} from './gmail-alerts.mjs';
+import {createAttendanceService} from './alert-service.mjs';
 import {createAccess} from './access.mjs';
 import {createCorrections} from './corrections.mjs';
 import { readFile } from 'node:fs/promises';
@@ -14,6 +16,8 @@ config.payclock.cacheSummary=path.join(root,'data','payclock','overview.json');
 const port=Number(process.env.MIR_PORT || config.port);
 const access=await createAccess(root),corrections=await createCorrections(root);
 const payclock=createPayclockService(config,root);
+const alertGmail=await createAlertGmail(root,config.attendanceAlerts?.gmailClientFile||path.join(root,'data','alerts','gmail-oauth.json'));
+const attendance=await createAttendanceService(root,payclock,alertGmail);
 if(!Number.isInteger(port) || port<1024 || port>65535) throw Error('Invalid local port');
 let current=null, inflight=null, fedfishAt=0;
 async function refresh(){if(inflight)return inflight;inflight=snapshot(config).then(s=>{current=s;fedfishAt=Date.now();return s;}).finally(()=>inflight=null);return inflight;}
@@ -22,6 +26,8 @@ const nightly=createPayclockScheduler(payclock,root,config.timezone||'America/Lo
 void startup.then(()=>nightly.tick()).catch(()=>{});
 setInterval(()=>nightly.tick().catch(()=>{}),60000).unref();
 setInterval(()=>refresh().catch(()=>{}),300000).unref();
+setInterval(()=>attendance.tick().catch(()=>{}),300000).unref();
+void startup.then(()=>attendance.tick()).catch(()=>{});
 // The FedFish PC list should stay close to live; the other sources keep the five-minute cycle.
 async function freshFedfish(force=false){if(!force && Date.now()-fedfishAt<30000)return;const f=await fedfishSource(config);fedfishAt=Date.now();current.sources.fedfish=f;}
 function view(days){
@@ -51,8 +57,9 @@ const server=http.createServer(async(req,res)=>{
     if(!safePeer(req.socket.remoteAddress))return reply(res,403,{error:'Company local network required.'});
     if(!safeHost(req.headers.host))return reply(res,403,{error:'Local host required.'});
     if(req.headers.origin && req.headers.origin!=='http://'+req.headers.host)return reply(res,403,{error:'Local origin required.'});
-    if(req.headers['sec-fetch-site']==='cross-site')return reply(res,403,{error:'Cross-site access denied.'});
+    if(req.headers['sec-fetch-site']==='cross-site'&&new URL(req.url,'http://localhost').pathname!=='/gmail-callback')return reply(res,403,{error:'Cross-site access denied.'});
     const u=new URL(req.url,'http://127.0.0.1:'+port);
+    if(u.pathname==='/gmail-callback'&&req.method==='GET'){try{await alertGmail.callback(u.searchParams);void attendance.tick();return reply(res,200,'<!doctype html><title>Gmail connected</title><h1>Gmail connected</h1><p>Sender verified as it@mir-mosaic.com.</p><a href="/payclock#attendance-alert-panel">Return to dashboard</a>','text/html');}catch(e){return reply(res,400,e.message,'text/plain');}}
     if(['/login','/login.js','/auth.js','/style.css','/favicon.svg'].includes(u.pathname)&&['GET','HEAD'].includes(req.method)){const files={'/login':['login.html','text/html'],'/login.js':['login.js','text/javascript'],'/auth.js':['auth.js','text/javascript'],'/style.css':['style.css','text/css'],'/favicon.svg':['favicon.svg','image/svg+xml']};const f=files[u.pathname];return reply(res,200,await readFile(path.join(root,'public',f[0]),'utf8'),f[1]);}
     if(u.pathname==='/api/auth/login'&&req.method==='POST'){if(req.headers['x-mir-request']!=='dashboard')return reply(res,403,{error:'Dashboard request required.'});try{const input=await body(req),result=access.login(req,input.name,input.pin);res.setHeader('Set-Cookie',result.cookie);return reply(res,200,result.session);}catch(e){return reply(res,e.status||400,{error:e.message});}}
     if(u.pathname==='/api/auth/logout'&&req.method==='POST'){if(req.headers['x-mir-request']!=='dashboard')return reply(res,403,{error:'Dashboard request required.'});res.setHeader('Set-Cookie',access.logout(req));return reply(res,200,{locked:true});}
@@ -63,6 +70,8 @@ const server=http.createServer(async(req,res)=>{
     if(u.pathname==='/api/payclock/adjustments'&&req.method==='GET'){try{return reply(res,200,{history:corrections.get(u.searchParams.get('employee'),u.searchParams.get('day'))});}catch(e){return reply(res,400,{error:e.message});}}
     if(u.pathname==='/api/payclock/undo'&&req.method==='POST'){if(req.headers['x-mir-request']!=='dashboard')return reply(res,403,{error:'Dashboard request required.'});try{const result=corrections.undo(await body(req),identity.name);payclock.invalidate();return reply(res,200,result);}catch(e){return reply(res,e.status||400,{error:e.message});}}
     if(u.pathname==='/api/payclock/adjustments'&&req.method==='POST'){if(req.headers['x-mir-request']!=='dashboard')return reply(res,403,{error:'Dashboard request required.'});try{const input=await body(req);if(!Array.isArray(input.original))throw Error('Reload the day before saving.');const result=corrections.save({...input,restoreOriginal:false},identity.name);payclock.invalidate();return reply(res,200,result);}catch(e){return reply(res,e.status||400,{error:e.message});}}
+    if(u.pathname==='/api/payclock/alerts'&&req.method==='GET')return reply(res,200,await attendance.status());
+    if(u.pathname.startsWith('/api/payclock/alerts')&&req.method==='POST'){if(req.headers['x-mir-request']!=='dashboard')return reply(res,403,{error:'Dashboard request required.'});try{if(u.pathname==='/api/payclock/alerts/preview')return reply(res,200,{events:await attendance.preview()});if(identity.name!=='Bayel')return reply(res,403,{error:'Bayel manages alert settings and Gmail connection.'});if(u.pathname==='/api/payclock/alerts/connect'){const peer=req.socket.remoteAddress?.replace(/^::ffff:/,'');if(!['127.0.0.1','::1',config.lan?.address].includes(peer))return reply(res,400,{error:'Connect Gmail once from the server computer at http://localhost:4320/payclock.'});return reply(res,200,{url:await alertGmail.connect()});}if(u.pathname==='/api/payclock/alerts/retry'){await attendance.retryUnconfirmed();return reply(res,200,{ready:true});}if(u.pathname==='/api/payclock/alerts/settings')return reply(res,200,await attendance.configure(await body(req)));return reply(res,404,{error:'Not found.'});}catch(e){return reply(res,e.status||400,{error:e.message});}}
     if(u.pathname==='/api/payclock/schedule' && req.method==='GET')return reply(res,200,await nightly.status());
     if(u.pathname==='/api/payclock/sources' && req.method==='GET')return reply(res,200,{files:await payclock.sources()});
     if(u.pathname==='/api/payclock/latest' && req.method==='GET'){

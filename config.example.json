@@ -28,5 +28,8 @@
     "provider": "openai",
     "model": "",
     "allowCloudSummary": false
+  },
+  "attendanceAlerts": {
+    "gmailClientFile": "C:/MirMosaic/credentials/gmail-oauth.json"
   }
 }
