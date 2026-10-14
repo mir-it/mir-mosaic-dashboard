@@ -16,7 +16,8 @@
   "payclock": {
     "project": "C:/MirMosaic/payclock",
     "host": "192.168.0.185",
-    "python": "python"
+    "python": "python",
+    "excludedEmployees": []
   },
   "inventory": {
     "enabled": true,

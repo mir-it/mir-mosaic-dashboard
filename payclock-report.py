@@ -94,8 +94,9 @@ def load_engine(project):
     return importlib.import_module('export_hours')
 
 
-def make_report(engine, rows, start, end, name_map, office_ids):
+def make_report(engine, rows, start, end, name_map, office_ids, excluded=()):
     # These are the same entry points and sequence used by run_export.
+    rows = [r for r in rows if r['employee_id'] not in set(excluded)]
     engine.apply_roster_names(rows, name_map)
     filtered = [r for r in rows if start <= engine.parse_ts(r['timestamp']).strftime('%Y-%m-%d') <= end]
     days = engine.build_days(filtered)
@@ -185,14 +186,21 @@ def run(request):
         source_name = 'Automatic local cache'
     if cache:
         rows = cache.rows(start, end)
+    excluded = set(request.get('excludedEmployees', []))
+    name_map = {}
+    roster_file = project/'employees_cache.json'
+    if roster_file.exists():
+        roster = json.loads(roster_file.read_text(encoding='utf-8-sig'))
+        name_map.update({str(e['employee_id']): e['name'] for e in roster.get('employees', [])})
+    name_map.update(engine.load_name_map(project/'employee_name_map.txt'))
+    office_ids = engine.load_office_ids(project/'office_employees.txt')
     adjustment_history=review.load_adjustments(output) if output else {}
     rows,original_rows=review.apply_adjustments(rows,adjustment_history,start,end)
     if request.get('selectedDates'):
         chosen = set(request['selectedDates'])
         rows = [r for r in rows if r['timestamp'][:10] in chosen]
     report = make_report(engine, rows, start, end,
-                         engine.load_name_map(project/'employee_name_map.txt'),
-                         engine.load_office_ids(project/'office_employees.txt'))
+                         name_map, office_ids, excluded)
     review.enrich(report,original_rows,cache.rows(cache.info()['start'],cache.info()['end']) if cache and cache.info()['start'] else original_rows,adjustment_history)
     report['adjustmentsRevision']=max((edits[0]['id'] for edits in adjustment_history.values()),default=0)
     report['source'] = {'kind': request.get('source') or ('saved-csv' if request.get('csv') else 'clock'), 'file': source_name}
@@ -205,10 +213,16 @@ def run(request):
         if info['start']:
             all_effective,all_original=review.apply_adjustments(cache.rows(info['start'],info['end']),adjustment_history,info['start'],info['end'])
             all_report = make_report(engine, all_effective, info['start'], info['end'],
-                engine.load_name_map(project/'employee_name_map.txt'), engine.load_office_ids(project/'office_employees.txt'))
+                name_map, office_ids, excluded)
             report['employees'] = [{'employeeId':r['employeeId'],'group':r['group'],'name':r['values'][1]} for r in all_report['totals']]
+            known = {r['employeeId']: r for r in report['employees']}
+            for employee, name in name_map.items():
+                if employee not in excluded:
+                    known.setdefault(employee, {'employeeId':employee, 'name':name, 'group':'Office' if employee in office_ids else 'Warehouse'})
+            report['employees'] = sorted(known.values(), key=lambda r:int(r['employeeId']))
+            save_json(output/'roster.json', report['employees'])
             save_json(output/'overview.json', {'rows': [{'date':r['values'][2], 'hours':r['values'][9], 'overtime':r['values'][11], 'status':r['values'][15], 'group':r['group']} for r in all_report['daily']],
-                'employees':len(all_report['totals']), 'latestDay':info['end'], 'files':[], 'errors':[], 'state':'connected',
+                'employees':len(report['employees']), 'latestDay':info['end'], 'files':[], 'errors':[], 'state':'connected',
                 'detail':'Persistent timestamp cache. Missing days are fetched read-only; existing punches are kept and deduplicated.', 'cache':info})
         if request.get('saveView',True):
             save_json(output/'last-report.json', report)

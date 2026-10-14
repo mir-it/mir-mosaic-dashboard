@@ -20,6 +20,14 @@ class ExcelParity(unittest.TestCase):
     def setUpClass(cls):
         cls.engine = adapter.load_engine(PROJECT)
 
+    def test_inactive_employees_are_excluded_without_mutating_raw_rows(self):
+        rows = [{'employee_id':e, 'name':'Employee '+e, 'timestamp':'2026-10-13 08:00:00', 'workcode':'', 'source':'clock'} for e in ['18','21','26','57']]
+        report = adapter.make_report(self.engine, rows, '2026-10-13', '2026-10-13', {'57':'Pinheiro, Erika'}, set(), ['18','21','26'])
+        self.assertEqual([r['employeeId'] for r in report['daily']], ['57'])
+        self.assertEqual([r['employeeId'] for r in report['totals']], ['57'])
+        self.assertEqual(report['punchCount'], 1)
+        self.assertEqual(len(rows), 4)
+
     def assert_excel_parity(self, rows, start, end, office):
         report = adapter.make_report(self.engine, [dict(r) for r in rows], start, end, {}, office)
         selected = [r for r in rows if start <= r['timestamp'][:10] <= end]

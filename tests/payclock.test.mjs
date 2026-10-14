@@ -8,6 +8,8 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 const root=fileURLToPath(new URL('../',import.meta.url));
 const config=JSON.parse(await readFile(new URL('../config.json',import.meta.url),'utf8'));
+// Baseline parity includes the full fixture; inactive filtering is tested separately.
+config.payclock.excludedEmployees=[];
 test('date ranges reject invalid dates and bound device workload',()=>{
   validateRange('2026-09-01','2026-09-15');validateRange('2026-09-01','2026-09-01');
   validateRange('2020-01-01','2026-10-12',36524);
