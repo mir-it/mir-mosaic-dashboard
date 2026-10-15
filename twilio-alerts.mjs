@@ -1,0 +1,13 @@
+import {readFile,writeFile,mkdir,rename} from 'node:fs/promises';
+import path from 'node:path';
+export function smsParts(text){const chars=Array.from(text),parts=[];for(let i=0;i<chars.length;i+=1300)parts.push(chars.slice(i,i+1300).join(''));return parts.map((p,i)=>parts.length>1?'Mir Mosaic ('+(i+1)+'/'+parts.length+')\n'+p:p);}
+export async function createAlertSms(root,fetcher=fetch){
+ const folder=path.join(root,'data','alerts');await mkdir(folder,{recursive:true});const file=path.join(folder,'twilio.json'),queueFile=path.join(folder,'sms-delivery.json');let queue;try{queue=JSON.parse(await readFile(queueFile,'utf8'));}catch(e){if(e.code!=='ENOENT')throw e;queue=[];}let busy=false;
+ const save=async()=>{await writeFile(queueFile+'.tmp',JSON.stringify(queue,null,2));await rename(queueFile+'.tmp',queueFile);};
+ async function config(){try{const c=JSON.parse(await readFile(file,'utf8'));return {...c,ready:c.enabled===true&&/^AC[0-9a-f]{32}$/i.test(c.accountSid||'')&&/^[0-9a-f]{32}$/i.test(c.authToken||'')&&/^\+[1-9]\d{7,14}$/.test(c.from||'')&&c.to==='+16692498737'};}catch{return {ready:false};}}
+ return {
+  async status(){const c=await config();return {ready:c.ready,to:'+16692498737',pending:queue.filter(q=>q.state==='pending').length,problem:queue.some(q=>['unknown','failed'].includes(q.state))?'SMS delivery needs checking in Twilio Messaging logs.':null};},
+  async enqueue(id,text){if(queue.some(q=>q.emailId===id))return;queue.push(...smsParts(text).map((body,index)=>({emailId:id,index,body,state:'pending',createdAt:new Date().toISOString()})));await save();},
+  async drain(){if(busy)return;busy=true;try{const c=await config();if(!c.ready)return;for(const item of queue){if(item.state!=='pending'||queue.some(q=>q.emailId===item.emailId&&['unknown','failed'].includes(q.state)))continue;item.state='unknown';await save();try{const r=await fetcher('https://api.twilio.com/2010-04-01/Accounts/'+c.accountSid+'/Messages.json',{method:'POST',headers:{Authorization:'Basic '+Buffer.from(c.accountSid+':'+c.authToken).toString('base64'),'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({To:c.to,From:c.from,Body:item.body}),signal:AbortSignal.timeout(30000)});const value=await r.json();if(!r.ok||!value.sid){item.state='failed';item.error='Twilio rejected SMS'+(Number.isInteger(value.code)?' (code '+value.code+')':'.');await save();break;}item.sid=value.sid;item.state='accepted';item.acceptedAt=new Date().toISOString();await save();}catch{item.error='SMS acceptance unconfirmed; check Twilio logs before retrying.';await save();break;}}}finally{busy=false;}}
+ };
+}
