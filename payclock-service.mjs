@@ -1,3 +1,4 @@
+import {DatabaseSync} from 'node:sqlite';
 import {spawn} from 'node:child_process';
 import {readdir,lstat,realpath,mkdir,readFile,writeFile,unlink,rmdir} from 'node:fs/promises';
 import path from 'node:path';
@@ -51,6 +52,11 @@ export function createPayclockService(config,root){
     return result.sort((a,b)=>b.modified.localeCompare(a.modified));
   }
   const service={
+    async cacheStatus(){
+      const file=path.join(output,'punches.sqlite3');await lstat(file);
+      const db=new DatabaseSync(file,{readOnly:true});
+      try{const today=new Intl.DateTimeFormat('en-CA',{timeZone:config.timezone||'America/Los_Angeles'}).format(new Date());return {lastClockPull:db.prepare("SELECT max(imported_at) AS at FROM imports WHERE source IN ('clock-read','clock-refresh')").get().at,punches:db.prepare('SELECT count(*) AS n FROM punches').get().n,completeDays:db.prepare('SELECT count(*) AS n FROM coverage WHERE complete=1 AND date<?').get(today).n};}finally{db.close();}
+    },
     invalidate(){initialization=null;},
     remember(report){cleanup();const id=randomUUID();jobs.set(id,{state:'ready',report,created:Date.now()});return id;},
     async sources(){return (await files()).map(({file,...r})=>r);},

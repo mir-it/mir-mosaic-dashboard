@@ -43,7 +43,7 @@ function displayReport(value,id){
   if(missingDays.length)$('load-status').textContent+=` ${missingDays.length} days are missing or partial; Fetch fills gaps (up to 93 days at a time).`;
   if(report.cache?.partialDates?.some(d=>d>=report.start&&d<=report.end))$('load-status').textContent+=' Current or unfinished days remain partial; Fetch or the nightly pull refreshes them.';
   $('range-title').textContent=report.start+' — '+report.end;
-  $('source-note').textContent='Local database · '+(report.cache?.punches||0)+' timestamps · '+(report.cache?.completeDates?.length||0)+' complete days · Updated '+new Date(report.cache?.updatedAt||report.generatedAt).toLocaleString();
+  $('source-note').textContent='Checking latest clock pull…';void refreshClockStatus();
   calendarMonth=report.end.slice(0,7);render();renderCalendar();
 }
 function populateEmployees(){
@@ -243,3 +243,7 @@ $('alerts-preview').addEventListener('click',async()=>{$('alerts-preview').disab
 $('alerts-retry').addEventListener('click',async()=>{try{await request('/api/payclock/alerts/retry',{method:'POST',headers:{'X-Mir-Request':'dashboard'}});await loadAlerts();}catch(e){$('alerts-status').textContent=e.message;}});
 
 $('alerts-send').addEventListener('click',async()=>{const button=$('alerts-send');button.disabled=true;button.textContent='Checking and sending...';try{const result=await request('/api/payclock/alerts/send',{method:'POST',headers:{'X-Mir-Request':'dashboard'}});await loadAlerts();$('alerts-status').textContent+=' '+result.message;}catch(e){$('alerts-status').textContent=e.message;}finally{button.disabled=false;button.textContent='Send email alert';}});
+
+async function refreshClockStatus(){if(!report)return;try{const status=await request('/api/payclock/cache-status');$('source-note').textContent='Local database · '+status.punches+' timestamps · '+status.completeDays+' complete days · Last clock pull: '+(status.lastClockPull?new Date(status.lastClockPull).toLocaleString('en-US',{timeZone:'America/Los_Angeles'})+' Pacific':'None recorded');}catch{$('source-note').textContent='Latest clock pull status unavailable.';}}
+setInterval(()=>{if(!document.hidden)void refreshClockStatus();},30000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)void refreshClockStatus();});

@@ -69,6 +69,7 @@ const server=http.createServer(async(req,res)=>{
     const identity=access.session(req);if(!identity){if(u.pathname.startsWith('/api/'))return reply(res,401,{error:'Session locked. Enter your PIN.'});res.writeHead(302,{...headers,Location:'/login'});return res.end();}
     if(u.pathname==='/api/auth/activity'&&req.method==='POST'){if(req.headers['x-mir-request']!=='dashboard')return reply(res,403,{error:'Dashboard request required.'});const renewed=access.touch(req);if(!renewed)return reply(res,401,{error:'Session locked.'});res.setHeader('Set-Cookie',renewed.cookie);return reply(res,200,renewed.session);}
     if(u.pathname==='/api/auth/session'&&req.method==='GET')return reply(res,200,identity);
+    if(u.pathname==='/api/payclock/cache-status'&&req.method==='GET')return reply(res,200,await payclock.cacheStatus());
     if(u.pathname==='/api/payclock/revision'&&req.method==='GET')return reply(res,200,{revision:corrections.version()});
     if(u.pathname==='/api/payclock/adjustments'&&req.method==='GET'){try{return reply(res,200,{history:corrections.get(u.searchParams.get('employee'),u.searchParams.get('day'))});}catch(e){return reply(res,400,{error:e.message});}}
     if(u.pathname==='/api/payclock/undo'&&req.method==='POST'){if(req.headers['x-mir-request']!=='dashboard')return reply(res,403,{error:'Dashboard request required.'});try{const result=corrections.undo(await body(req),identity.name);payclock.invalidate();return reply(res,200,result);}catch(e){return reply(res,e.status||400,{error:e.message});}}
