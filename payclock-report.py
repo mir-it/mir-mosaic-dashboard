@@ -193,7 +193,7 @@ def run(request):
         roster = json.loads(roster_file.read_text(encoding='utf-8-sig'))
         name_map.update({str(e['employee_id']): e['name'] for e in roster.get('employees', [])})
     name_map.update(engine.load_name_map(project/'employee_name_map.txt'))
-    office_ids = engine.load_office_ids(project/'office_employees.txt')
+    office_ids = set(engine.load_office_ids(project/'office_employees.txt')) | set(request.get('officeEmployeeIds', []))
     adjustment_history=review.load_adjustments(output) if output else {}
     rows,original_rows=review.apply_adjustments(rows,adjustment_history,start,end)
     if request.get('selectedDates'):

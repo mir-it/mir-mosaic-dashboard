@@ -17,14 +17,14 @@ export async function createAttendanceService(root,payclock,gmail,now=()=>new Da
    if(!settings.recipients.length&&!(settings.warehouseRecipients||[]).length)throw Error('Save at least one recipient first.');
    sending=true;
    try{if(!(await gmail.status()).connected)throw Error('Connect it@ Gmail first.');const events=await scan(true);let sentCount=0,emails=0;
-    const streams=[{key:'all',recipients:settings.recipients,delivered:state.delivered,events},{key:'warehouse',recipients:settings.warehouseRecipients||[],delivered:state.warehouseDelivered,events:events.filter(e=>e.group==='Warehouse')}];
+    const streams=['Warehouse','Office'].map(team=>({key:team.toLowerCase(),recipients:settings.recipients,cc:team==='Warehouse'?(settings.warehouseRecipients||[]):[],delivered:state.delivered,events:events.filter(e=>e.group===team)}));
     for(const stream of streams){if(!stream.recipients.length)continue;const fresh=stream.events.filter(e=>!stream.delivered[e.id]);if(!fresh.length)continue;
-     state.inFlight={at:new Date().toISOString(),stream:stream.key,ids:fresh.map(e=>e.id),recipients:[...stream.recipients]};await save();
-     const message=alertMessage(fresh,localParts(now(),settings.timeZone).date,dashboardUrl);if(stream.key==='warehouse')message.subject='Warehouse · '+message.subject;
+     state.inFlight={at:new Date().toISOString(),stream:stream.key,ids:fresh.map(e=>e.id),recipients:[...stream.recipients],cc:[...stream.cc]};await save();
+     const message=alertMessage(fresh,localParts(now(),settings.timeZone).date,dashboardUrl);message.subject=(stream.key==='warehouse'?'Warehouse':'Office')+' · '+message.subject;message.cc=stream.cc;
      const messageId=await gmail.send(state.inFlight.recipients,message),sentAt=new Date().toISOString();
      for(const e of fresh)stream.delivered[e.id]={sentAt,messageId};
-     state.history.push({stream:stream.key,sentAt,messageId,count:fresh.length,recipients:state.inFlight.recipients,items:fresh.map(e=>({employee:e.employee,name:e.name,kind:e.kind,description:e.description}))});state.lastSent=sentAt;state.inFlight=null;await save();sentCount+=fresh.length;emails++;
-     if(sms&&stream.key==='all'){try{await sms.enqueue(messageId,message.subject+'\n\n'+message.text);await sms.drain();}catch{state.error='Email sent; SMS queue could not be updated.';await save();}}
+     state.history.push({stream:stream.key,sentAt,messageId,count:fresh.length,recipients:state.inFlight.recipients,cc:state.inFlight.cc,items:fresh.map(e=>({employee:e.employee,name:e.name,kind:e.kind,description:e.description}))});state.lastSent=sentAt;state.inFlight=null;await save();sentCount+=fresh.length;emails++;
+     if(sms){try{await sms.enqueue(messageId,message.subject+'\n\n'+message.text);await sms.drain();}catch{state.error='Email sent; SMS queue could not be updated.';await save();}}
     }
     return {sent:emails>0,count:sentCount,message:emails?'Sent '+emails+' attendance email(s).':'No new attendance alerts to send. Previously sent issues are not repeated.'};
    }catch(e){state.error=e.message;await save().catch(()=>{});throw e;}finally{sending=false;}
