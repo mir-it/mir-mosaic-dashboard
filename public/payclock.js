@@ -249,7 +249,7 @@ setInterval(()=>{if(!document.hidden)void refreshClockStatus();},30000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)void refreshClockStatus();});
 
 let employeePhones={};
-function showEmployeePhone(){const entry=employeePhones[$('phone-employee').value];$('employee-phone').value=entry?.phone||'';$('phone-status').textContent=entry?.updatedAt?'Saved by '+entry.updatedBy+' · '+new Date(entry.updatedAt).toLocaleString():'';}
+function showEmployeePhone(){const entry=employeePhones[$('phone-employee').value];$('employee-phone').value=(entry?.phone||'').replace(/^\+1/,'');$('phone-status').textContent=entry?.updatedAt?'Saved by '+entry.updatedBy+' · '+new Date(entry.updatedAt).toLocaleString():'';}
 async function loadEmployeePhones(){try{const data=await request('/api/payclock/employee-phones');employeePhones=data.employees;const previous=$('phone-employee').value;$('phone-employee').innerHTML='<option value="">Choose employee</option>'+(data.roster||[]).map(e=>'<option value="'+esc(e.employeeId)+'">'+esc(e.name)+' · '+esc(e.employeeId)+'</option>').join('');$('phone-employee').value=previous;showEmployeePhone();$('employee-sms-status').textContent=(data.sms.ready?'Twilio credentials configured.':'Twilio credentials required.')+' '+data.sms.assigned+' employees with phone numbers.'+(data.sms.problem?' '+data.sms.problem:'');}catch(e){$('phone-status').textContent=e.message;}}
 $('employee-sms-panel').addEventListener('toggle',()=>{if($('employee-sms-panel').open)void loadEmployeePhones();});
 $('phone-employee').addEventListener('change',showEmployeePhone);
