@@ -1,48 +1,96 @@
 # Mir Mosaic Operations Dashboard
 
-Local company dashboard for FedFish orders, Payclock attendance and AI Email Processor activity. Existing application data and clock records are read-only. Four individual PIN sessions lock after 15 minutes of inactivity.
+I built this dashboard to bring our order processing and attendance tools into one place. It runs on a company computer and is available to the team over the local network.
 
-## Run locally
+The main goal was to make daily work easier without replacing the systems we already use. The dashboard reads their data, keeps a local attendance cache, and gives the team a shared place to review records.
 
-Requires Node.js 24 or later and Python with openpyxl, plus the existing Payclock exporter and clock reader.
+## What it does
 
-1. Copy `config.example.json` to `config.json` and configure your application paths, Python executable and device address.
-2. Run `npm start`, or use `Start-Mira.bat` on Windows.
-3. Open `http://127.0.0.1:4320`. Initial PINs for Bayel, Tatyana, Emin and Fatima are generated into `data/access/initial-pins.txt` on first run.
+- **FedFish:** view sent orders, response messages, and payloads by source, with paginated history.
+- **Payclock:** browse punches by date or employee, review hours, correct missing or extra punches, and download Excel reports.
+- **AI Email Processor:** see activity from the existing order-processing application.
+- **Attendance alerts:** send separate Warehouse and Office emails, with additional CC recipients for Warehouse.
+- **Employee texts:** send private lunch notifications to employees who have a saved phone number.
 
-Local configuration, PINs, employee data, databases, exports and screenshots are excluded from Git. This repository backs up application code only. Back up both Payclock databases separately using SQLite's backup facility.
+This is a company-specific application. It connects to existing local projects and services; cloning this repository alone will not provide those systems or their data.
 
-## Attendance review
+## Running it
 
-Raw punches live in `data/payclock/punches.sqlite3`. Added times, disabled extras, assignments and undo revisions live separately in `data/payclock/adjustments.sqlite3`. Reports and Excel combine both layers. Every correction records the signed-in person and a timestamp; reasons are optional. Conflicting drafts are rejected. Corrected days remain blue in Needs Review.
+You need Node.js 24 or later, Python with `openpyxl`, and the existing Payclock exporter and clock reader.
 
-Suggested punch roles use employee history where available and explicitly disclosed fallback shift times. Suggestions require human review and saving; they never alter the clock. Click review patterns to open lists of matching days.
+1. Copy `config.example.json` to `config.json`.
+2. Set the paths to the source applications, Python executable, and clock address.
+3. Run `npm start`, then open `http://localhost:4320`.
 
-Completed days use local cache; missing and partial days fetch all employees. Today remains partial until a later-day read. The running service checks for an 11 PM Pacific pull and catches up after restart. Period shortcuts show yesterday and completed calendar weeks.
+On Windows, `Start-Mira.bat` starts the server in the background. `Stop-Mira.bat` stops it. Logs are saved in `data/runtime/`. The server computer must stay awake for the dashboard and scheduled checks to work.
 
-## Local network
+Initial login PINs are generated in `data/access/initial-pins.txt`. Sessions lock after 15 minutes without user activity. Clicking, typing, and scrolling keep an active session open; background updates do not.
 
-LAN access is opt-in in `config.json` and needs an inbound firewall rule for port 4320. Current source restricts LAN peers to the configured office deployment's 192.168.8.0/22 subnet; adapt `safePeer` before using a different subnet. HTTP PIN access is not encrypted. No public hosting is configured.
+For access from other computers, enable LAN access in the configuration and allow port 4320 through the server's firewall. Check the `safePeer` network restriction in `server.mjs` when changing networks. The current login runs over HTTP and is intended for the company network, not the public internet.
 
-## Verification
+## How attendance data works
 
-`npm test` runs JavaScript tests. `python -B -m unittest discover -s tests -p "test_*.py"` checks calculations and Excel output. Payclock integration tests require a local configured Payclock installation and approved fixture exports; no employee exports are distributed in this repository.
+The dashboard keeps raw punches in a local SQLite database. It reuses completed days and pulls missing or partial days for all employees together. Overlapping pulls add missing timestamps without duplicating existing punches. Today's records stay partial until a later-day pull closes that day.
 
-In the day editor, toggling Include proposes new roles for enabled punches without changing their times. Add missing punch identifies a missing shift role and inserts a blank time field in the correct role position. It never estimates a missing timestamp: enter the actual time before saving. These actions change only the unsaved draft.
+The calendar lets you select dates, fetch missing days, or view saved data. Shortcuts cover yesterday and the last one, two, or four completed weeks. A nightly pull runs at 11 PM Pacific, with catch-up after a restart. The page also shows the latest successful clock pull, including background alert checks.
 
-Sessions lock after 15 minutes of inactivity. Trusted clicks, typing, touch and scrolling renew the session through a throttled server activity endpoint. Background report polling does not renew sessions. Expiry updates are shared across tabs for the same browser origin; manual Lock signs the session out immediately.
+### Corrections
 
+Corrections are stored separately from the clock records. You can add a missing time, change a time or assignment, exclude an extra punch, undo a change, or restore the original records. Each saved change records who made it and when.
 
-## Manager attendance alerts
+All users see the same saved corrections. Reports, employee statistics, and Excel downloads include them. Corrected days stay visible in Needs Review with a blue label so they are easy to find again.
 
-Expand Manager attendance alerts in Payclock. Bayel can manage recipients, enable/pause delivery, adjust thresholds, exclude employee IDs and enter approved-leave date ranges. Initial recipients are Emin and Fatima; Tatyana can be added later. Settings and email delivery history live under ignored `data/alerts/`.
+The editor suggests punch assignments from employee history, but it does not invent missing times. Adding a missing punch creates a blank field for someone to fill in. Nothing changes until the draft is saved. If another user changes the same day, or new clock punches arrive, an outdated draft must be reloaded before saving.
 
-From the server computer, open `http://localhost:4320/payclock`, sign in as Bayel and select Connect it@ Gmail. Authorize **it@mir-mosaic.com**. A dedicated OAuth token is saved locally; existing AI Email Processor credentials/tokens are not modified. Only the Gmail send and email identity scopes are requested, and sender identity is verified. `attendanceAlerts.gmailClientFile` points to a Google Desktop OAuth client JSON. The server must have outbound internet access to Google.
+## Notifications
 
-While enabled and connected, the running server scans fresh clock data every five minutes from 6 AM to 9 PM Pacific, using saved corrections. Possible lunch delays are flagged four elapsed hours after arrival if no earlier lunch-out is recorded. Lateness means a first punch strictly after 8:30 AM on a weekday, with three such days in 30 days by default. Missing-work alerts require three consecutive completed expected weekdays without punches; weekends are optional. Never-fetched or partial closed dates cannot substantiate missing work. Approved leave and exclusions suppress matching cases. The eligibility window uses employees observed in the previous 30 days; roster/employment status and nonstandard shifts must be verified by a manager.
+The server checks attendance every five minutes between 6 AM and 9 PM Pacific while automatic alerts are enabled.
 
-Emails describe clock-record observations for human review, not confirmed absences or misconduct. Recipients get a digest of new items, deduplicated by employee and event (late patterns once per calendar month; missing runs once per run; lunch once per day). A durable in-flight marker prevents blind re-sending after an ambiguous Gmail/network failure. Check Gmail Sent before using the explicit retry control. No live email has been sent until the requested sender is connected.
+Manager emails cover:
 
-Windows Start-Mira starts a detached hidden dashboard process and records its PID and logs in `data/runtime/`. Closing the chat does not control that process. Stop-Mira verifies the server command line before stopping the LAN listener. The current deployment is in email testing mode with it@mir-mosaic.com as the sole recipient; restore manager recipients through alert settings after testing.
+- No lunch-out punch by five hours after the first punch, or a lunch-out recorded after that point.
+- Three or more weekday arrivals after 8:30 AM in the trailing 30-day period.
+- Three consecutive completed weekdays with no punches. Missing or partial clock coverage does not count as an absence.
 
-Attendance alerts use a branded HTML layout with category counts, employee cards, evidence tables and a Payclock link, plus a plain-text alternative. Preview email design shows sample data without sending any email.
+Warehouse and Office records go into separate emails. Both use the main recipient list; only Warehouse emails include the Warehouse CC list. Lunch alerts are sent once per employee per day, lateness alerts once per calendar month, and missing-work alerts once per consecutive streak. Approved leave, employee exclusions, and temporary lunch exemptions affect which alerts are generated.
+
+### Gmail
+
+Set `attendanceAlerts.gmailClientFile` to the Google OAuth client file. From the server computer, sign in with the administrator PIN and use **Connect it@ Gmail** in the alerts section. The integration verifies the configured company mailbox and stores its token separately from the email-processing application's credentials.
+
+Emails include the relevant dates and punches. A design preview uses sample records and sends nothing. If Gmail does not confirm a send, automatic email delivery pauses until someone checks Sent and uses the retry control.
+
+### Twilio SMS
+
+Under **Employee lunch notifications**, select an employee and save their 10-digit US phone number. The application adds `+1` automatically. Clearing the field removes that employee from text notifications. Phone edits record the signed-in user and reject conflicting updates.
+
+Texts go only to employees with saved numbers and only when a lunch-out is still missing after five hours. They contain that employee's notification, not the manager digest. Each employee gets at most one lunch text per day. Old pending messages are cancelled when the day changes, the lunch alert clears, or the phone number changes.
+
+Twilio credentials belong in `data/alerts/twilio.json`. Sending requires a paid account and an approved SMS sender. Trial accounts may reject custom messages. An accepted API request is recorded separately from confirmed delivery; delivery problems can be checked in Twilio's logs.
+
+## Local files and backups
+
+These files stay outside Git:
+
+- `config.json` and Twilio/Gmail credentials
+- Login PINs and employee phone numbers
+- Punch databases, corrections, and notification history
+- Exports, screenshots, and runtime logs
+
+The raw punch cache is `data/payclock/punches.sqlite3`. Corrections are in `data/payclock/adjustments.sqlite3`. Back up both with SQLite's backup facility, along with the local settings you need to restore the installation. A Git clone restores the code, not the working data.
+
+## Tests
+
+Run the JavaScript tests with:
+
+```sh
+npm test
+```
+
+Run the Python report and punch-review tests with:
+
+```sh
+python -B -m unittest discover -s tests -p "test_*.py"
+```
+
+Some integration tests need the existing Payclock installation and local export fixtures. Those fixtures are not included in this repository. Tests cover report calculations, Excel output, cache behavior, corrections, sessions, email routing, and lunch-only SMS delivery rules.
