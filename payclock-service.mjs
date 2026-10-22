@@ -92,7 +92,7 @@ export function createPayclockService(config,root){
       if(busy)throw Object.assign(Error('A clock report is already loading. Please wait.'),{status:409});
       const id=randomUUID(),job={state:'running',created:Date.now()};jobs.set(id,job);busy=true;
       while(jobs.size>8){const oldest=[...jobs].find(([,j])=>j.state!=='running');if(!oldest)break;jobs.delete(oldest[0]);}
-      const request={officeEmployeeIds:config.payclock.officeEmployeeIds||[],excludedEmployees:config.payclock.excludedEmployees||[],project:config.payclock.project,host:config.payclock.host,output,csv,selectedDates:input.selectedDates,start:input.start,end:input.end,source:input.source,today,saveView:input.saveView!==false,files:available.slice().reverse()};
+      const request={employeeNames:config.payclock.employeeNames||{},officeEmployeeIds:config.payclock.officeEmployeeIds||[],excludedEmployees:config.payclock.excludedEmployees||[],project:config.payclock.project,host:config.payclock.host,output,csv,selectedDates:input.selectedDates,start:input.start,end:input.end,source:input.source,today,saveView:input.saveView!==false,files:available.slice().reverse()};
       void calculate(request,job,id);
       return {id,state:job.state};
     },
